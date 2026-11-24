@@ -31,6 +31,13 @@ OUT_SHARP = 0.65            # 신문 출력 샤프닝 양
 
 def luma(x): return 0.2126 * x[..., 0] + 0.7152 * x[..., 1] + 0.0722 * x[..., 2]
 
+def wb_gains(img, strength):
+    """partial_wb 와 같은 수식으로 이득만 계산(측광 영역과 적용 영역 분리용)."""
+    if strength <= 0: return np.ones(3, np.float32)
+    y = luma(img); m = (y > np.percentile(y, 20)) & (y < np.percentile(y, 90))
+    mean = img[m].mean(0) + 1e-6
+    return ((mean.mean() / mean) ** strength).astype(np.float32)
+
 def partial_wb(img, strength):
     if strength <= 0: return img
     y = luma(img); m = (y > np.percentile(y, 20)) & (y < np.percentile(y, 90))
@@ -69,7 +76,7 @@ def denoise(rgb, iso):
     return cv2.cvtColor(ycc, cv2.COLOR_YCrCb2RGB)
 
 def develop(args):
-    nef, out, look_name, crop = args
+    nef, out, look_name, crop, meter = args
     L = LOOKS[look_name]
     with rawpy.imread(nef) as raw:
         iso = 0
@@ -81,13 +88,16 @@ def develop(args):
                               output_color=rawpy.ColorSpace.sRGB, highlight_mode=rawpy.HighlightMode.Blend)
     img = rgb.astype(np.float32) / 65535.0; del rgb
     H, W = img.shape[:2]
-    if crop:
-        x0, y0, x1, y1 = crop
-        img = img[int(y0 * H):int(y1 * H), int(x0 * W):int(x1 * W)]
-    # 1) 화이트밸런스: 현장광을 장면 의도만큼만 중화 + 룩 틴트
-    img = partial_wb(img, L["wb"]) * np.array(L["tint"], np.float32)
-    # 2) 노출: 톤맵 후 표시값 기준으로 중앙 중간톤을 룩의 mid에 맞춤(이분 탐색)
-    y = luma(img); h, w = y.shape
+    cut = lambda a, c: a if not c else a[int(c[1] * H):int(c[3] * H), int(c[0] * W):int(c[2] * W)]
+    # 측광 기준 영역: 지정(meter)이 있으면 그 영역, 없으면 최종 크롭 영역.
+    # 리프레이밍 때 기존에 승인된 프레임을 meter로 두면 크롭이 바뀌어도 WB·노출·국소대비 반경이 그대로 유지된다.
+    ref = cut(img, meter or crop)
+    img = cut(img, crop)
+    # 1) 화이트밸런스: 현장광을 장면 의도만큼만 중화 + 룩 틴트 (이득은 측광 영역에서 계산)
+    gains = wb_gains(ref, L["wb"])
+    img = img * gains * np.array(L["tint"], np.float32)
+    # 2) 노출: 톤맵 후 표시값 기준으로 측광 영역 중앙 중간톤을 룩의 mid에 맞춤(이분 탐색)
+    y = luma(ref * gains * np.array(L["tint"], np.float32)); h, w = y.shape; clar_ref = max(h, w); del ref
     cw = cv2.resize(y[h // 6: h * 5 // 6, w // 6: w * 5 // 6], None, fx=0.1, fy=0.1)
     lo, hi = -3.0, 5.0
     for _ in range(14):
@@ -95,6 +105,7 @@ def develop(args):
         if np.median(srgb_oetf(tonemap(cw * 2 ** ev))) < L["mid"]: lo = ev
         else: hi = ev
     img = img * (2 ** ev)
+    h, w = img.shape[:2]   # 이후 단계(비네팅 등)는 최종 크롭 크기 기준
     # 3) 톤맵 + 감마 + S커브 콘트라스트
     img = srgb_oetf(tonemap(img)).astype(np.float32)
     sm = img * img * (3 - 2 * img); img = img + L["contrast"] * (sm - img)
@@ -103,7 +114,7 @@ def develop(args):
     # 5) 색: 장면별 HSL + 신문 색역 압축
     img = hsl_adjust(np.clip(img, 0, 1), L["hsl"], L["sat"])
     # 6) 국소 대비(clarity), 중간톤에만
-    Y = luma(img); blur = cv2.GaussianBlur(Y, (0, 0), max(Y.shape) / 150)
+    Y = luma(img); blur = cv2.GaussianBlur(Y, (0, 0), clar_ref / 150)   # 반경은 측광 영역 기준(크롭 무관)
     mid = 1 - np.abs(Y - 0.5) * 2
     Y2 = Y + L["clarity"] * (Y - blur) * mid.clip(0, 1)
     img = img * (Y2 / np.maximum(Y, 1e-4))[..., None]
@@ -127,14 +138,16 @@ def load_edits(path):
     rows = []
     for l in open(path, encoding="utf-8"):
         if l.startswith("#") or not l.strip(): continue
-        n, look, crop, *_ = l.rstrip("\n").split("\t")
-        rows.append((n, look, None if crop == "-" else tuple(map(float, crop.split(",")))))
+        f = l.rstrip("\n").split("\t"); n, look, crop = f[:3]
+        meter = f[4] if len(f) > 4 else "-"   # 5열: 측광 기준 영역(리프레이밍 컷용), "-"면 크롭 영역
+        p = lambda v: None if v in ("-", "") else tuple(map(float, v.split(",")))
+        rows.append((n, look, p(crop), p(meter)))
     return rows
 
 if __name__ == "__main__":
     nef_dir, out_dir, edits = sys.argv[1:4]; only = set(sys.argv[4:])
     os.makedirs(out_dir, exist_ok=True)
-    jobs = [(f"{nef_dir}/{n}.NEF", f"{out_dir}/{n}.jpg", look, crop) for n, look, crop in load_edits(edits) if not only or n in only]
+    jobs = [(f"{nef_dir}/{n}.NEF", f"{out_dir}/{n}.jpg", look, crop, meter) for n, look, crop, meter in load_edits(edits) if not only or n in only]
     import multiprocessing as mp
     with ProcessPoolExecutor(int(os.environ.get("WORKERS", 3)), mp_context=mp.get_context("spawn")) as ex:
         for r in ex.map(develop, jobs): print(r, flush=True)

@@ -63,3 +63,7 @@ PT2_0105.jpg rainpitch iso110 ev+2.15 6016x3092
 PT2_0482.jpg cleantech iso7200 ev+2.64 6016x4016
 PT1_0021.jpg hardwood iso1600 ev+2.19 1925x3535
 PT1_0021.jpg hardwood iso1600 ev+2.16 2226x3334  # A안 재프레이밍
+# 측광 영역 고정(meter) 도입 후 리프레이밍 컷 재현상
+PT1_0021.jpg hardwood iso1600 ev+2.00 2226x3334  # meter=0.03,0.15,0.78,1.00 (이전 승인 프레임)
+PT2_0478.jpg cleantech iso12800 ev+1.71 4211x2489  # A안, meter=전체 프레임
+# 측정: 겹치는 영역 색차 중앙값 ΔE — 2번 3.1(고정 전)→1.0(고정 후), 49번 4.4→0.7. 회귀 확인: meter 없는 PT1_0556·PT1_0012 화소 차 0
