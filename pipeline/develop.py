@@ -11,11 +11,11 @@ from concurrent.futures import ProcessPoolExecutor
 # key: 중간톤 목표(선형), clarity: 국소 대비, matte: 블랙 리프트, vign: 비네팅
 # hsl: (중심 hue°, 폭°, hue 이동°, 채도 배율) 목록, sat: 전역 채도
 # v3.1: v3 대비 — 마스터에서 인쇄용 미드톤 리프트 제거, 매트 블랙 제거, 채도 복원, 블랙 포인트·하늘 그라데이션 추가
-# black: 레벨 블랙 포인트(0..1), grad: 화면 위쪽 그라데이션 필터(−EV, 위 45%에서 0으로 감쇠)
+# black: 레벨 블랙 포인트(0..1), grad: 화면 위쪽 그라데이션 필터(−EV, 위 30%에서 0으로 감쇠)
 LOOKS = {
-    "hardwood":  dict(wb=0.55, tint=(1.02, 1.00, 0.98), mid=0.45, contrast=0.45, black=0.02, grad=0, clarity=0.30, matte=0, vign=0.18, sat=1.05,
+    "hardwood":  dict(shadow_lift=0.06, wb=0.55, tint=(1.02, 1.00, 0.98), mid=0.45, contrast=0.45, black=0.02, grad=0, clarity=0.30, matte=0, vign=0.18, sat=1.05,
                       hsl=[(45, 25, 0, 0.88), (0, 15, 0, 1.15), (220, 30, 0, 1.15)]),
-    "rainpitch": dict(wb=0.50, tint=(0.98, 1.00, 1.02), mid=0.43, contrast=0.40, black=0.02, grad=0.6, clarity=0.28, matte=0, vign=0.14, sat=1.05,
+    "rainpitch": dict(shadow_lift=0.07, wb=0.50, tint=(0.98, 1.00, 1.02), mid=0.43, contrast=0.40, black=0.02, grad=0.6, clarity=0.28, matte=0, vign=0.14, sat=1.05,
                       hsl=[(105, 40, 0, 1.08), (0, 12, 0, 1.15), (30, 15, 0, 1.10)]),
     "arena":     dict(wb=0.50, tint=(0.95, 1.00, 1.06), mid=0.27, contrast=0.50, black=0.04, grad=0, clarity=0.22, matte=0, vign=0.18, sat=1.05,
                       hsl=[(120, 30, 0, 1.20), (210, 40, 0, 1.20), (25, 20, 0, 0.85)]),
@@ -27,7 +27,8 @@ LOOKS = {
                       hsl=[(115, 30, 0, 1.00)]),
     "campus":    dict(wb=0.70, tint=(1.00, 1.00, 1.00), mid=0.44, contrast=0.30, black=0.01, grad=0, clarity=0.20, matte=0, vign=0.05, sat=1.03, hsl=[]),
 }
-SKIN_BAND = (22, 24, 0, 0.92, 1.05)   # v3.2: 피부(주황) 대역 — 전역 채도 상향에서 제외, 살짝 밝게
+SKIN_BAND = (30, 26, 0, 0.85, 1.05)   # v3.2: 피부(주황) 대역 — 전역 채도 상향에서 제외, 살짝 밝게
+SHADOW_LIFT = 0.035                   # v3.2: 그림자 톤(Y≈0.22) 범프 — 그늘진 얼굴이 뭉개지지 않게
 SKIN_LIFT = 0.05                       # v3.2: 피부가 있는 중상 톤(Y≈0.58) 범프 커브 높이
 NEWSPRINT_MID_LIFT = 1.0    # v3.1: 마스터에는 적용 안 함(인쇄 대응은 CMYK 변환 단계에서 별도)
 OUT_SHARP = 0.65            # 신문 출력 샤프닝 양
@@ -99,8 +100,8 @@ def develop(args):
         if np.median(srgb_oetf(tonemap(cw * 2 ** ev))) < L["mid"]: lo = ev
         else: hi = ev
     img = img * (2 ** ev)
-    if L.get("grad"):   # 그라데이션 필터(하늘): 위에서 아래로 45% 지점까지 선형 감쇠
-        hh = img.shape[0]; ramp = np.clip(1 - np.arange(hh, dtype=np.float32) / (0.45 * hh), 0, 1)
+    if L.get("grad"):   # 그라데이션 필터(하늘): 위에서 아래로 30% 지점까지 선형 감쇠(선수 머리에 닿지 않게)
+        hh = img.shape[0]; ramp = np.clip(1 - np.arange(hh, dtype=np.float32) / (0.30 * hh), 0, 1)
         img = img * (2 ** (-L["grad"] * ramp))[:, None, None]
     # 3) 톤맵 + 감마 + S커브 콘트라스트
     img = srgb_oetf(tonemap(img)).astype(np.float32)
@@ -108,7 +109,7 @@ def develop(args):
     if L.get("black"): img = np.clip((img - L["black"]) / (1 - L["black"]), 0, 1)   # 블랙 포인트
     sl = L.get("skin_lift", SKIN_LIFT)   # v3.2: 그림자 대비는 두고 피부 톤역(중상 톤)만 연다
     if sl:
-        Yb = luma(img); Y2 = Yb + sl * np.exp(-0.5 * ((Yb - 0.58) / 0.13) ** 2)
+        Yb = luma(img); Y2 = Yb + sl * np.exp(-0.5 * ((Yb - 0.58) / 0.13) ** 2) + L.get("shadow_lift", SHADOW_LIFT) * np.exp(-0.5 * ((Yb - 0.22) / 0.10) ** 2)
         img = np.clip(img * (Y2 / np.maximum(Yb, 1e-4))[..., None], 0, 1)
     # 4) 노이즈(고감도)
     img = denoise(img, iso)

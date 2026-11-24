@@ -30,7 +30,7 @@ python3 -I pipeline/develop.py raw/ out/ looks/edits.tsv PT1_0556   # 일부만
 ## 폴더 지도
 | 경로 | 내용 |
 |---|---|
-| `out/` | **최종 보정본 50장**(JPEG q95, sRGB, 300dpi) |
+| `out/` | **최종 보정본 50장, v3.2**(JPEG q95, sRGB, 300dpi, 인쇄용 CMYK 변환 전) |
 | `work/01_inventory/` | Drive 파일 목록, 최종 50장 NEF ID, 전체 EXIF(1,186장) |
 | `work/02_thumbs/` | 1차 평가에 쓴 2000px 썸네일 1,186장 |
 | `work/03_scores/` | 기술 지표, CLIP 점수·장면, 임베딩, 후보·검증 결과, 69장·50장 목록 |
@@ -43,4 +43,4 @@ python3 -I pipeline/develop.py raw/ out/ looks/edits.tsv PT1_0556   # 일부만
 NEF 원본은 저장소에 넣지 않는다. Drive 폴더 「2026Stadium사진」이 기준이다(ID: `work/01_inventory/final50_nef_ids.tsv`).
 
 ## 보정 원칙
-전역 톤·색, 크롭, 수평만 쓴다. 합성하거나 객체를 지우지 않는다. 자세한 기준은 브리프 2절에 있다.
+객체를 지우거나 합성하지 않는다. 그 밖의 톤·색·빛 조정(커브, HSL, 블랙 포인트, 그라데이션 필터, 비네팅)은 연출 수단으로 쓴다. 자세한 기준은 브리프 2절(개정)에 있다. 현재 `out/`은 v3.2다.
