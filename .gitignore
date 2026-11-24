@@ -1,7 +1,6 @@
-# 원본·대용량 산출물은 Drive/Release로 관리
+# 원본은 Drive(2026Stadium사진)가 기준 — 저장소에 넣지 않음
 raw/
-work/
-out/
+rerun/
 *.NEF
 *.nef
 *.tif

@@ -3,6 +3,7 @@
 포항공대신문 480호 4면 [대학] 「스타디움 & IT 아레나」 사진 데스크.
 2026 STadium·IST-TECH IT ARENA(11/14) 사진 1,186장 → 게재 후보 50장 선별 → 장면별 룩으로 RAW 현상.
 
+- **기술 파이프라인 공개 문서: [`docs/disclosure_pipeline.md`](docs/disclosure_pipeline.md)** ← 지면 고지문(안) 포함
 - 취재 맥락: [`docs/context.md`](docs/context.md)
 - 크리에이티브 브리프·룩북·지면 제안: [`docs/creative_brief.md`](docs/creative_brief.md)
 - 선정 목록: [`selection/final50.csv`](selection/final50.csv), 보정본 밀착: `selection/final50_graded_contact.jpg`
@@ -24,11 +25,22 @@ python3 -I pipeline/develop.py raw/ out/ looks/edits.tsv            # 전체
 python3 -I pipeline/develop.py raw/ out/ looks/edits.tsv PT1_0556   # 일부만
 ```
 
-필요 패키지: `rawpy opencv-python-headless<5 pillow numpy exifread imagehash open_clip_torch torch`
+필요 패키지: `pip install -r requirements.txt`
 
-## 산출물 관리
-NEF 원본(`raw/`)과 보정 JPG(`out/`)는 용량이 커서 git에 넣지 않는다(.gitignore).
-보정본은 GitHub Release 첨부 파일로 배포하고, 원본은 Drive 폴더 `2026Stadium사진`을 기준으로 한다(NEF ID는 `selection/nef_ids.tsv`).
+## 폴더 지도
+| 경로 | 내용 |
+|---|---|
+| `out/` | **최종 보정본 50장**(JPEG q95, sRGB, 300dpi) |
+| `work/01_inventory/` | Drive 파일 목록, 최종 50장 NEF ID, 전체 EXIF(1,186장) |
+| `work/02_thumbs/` | 1차 평가에 쓴 2000px 썸네일 1,186장 |
+| `work/03_scores/` | 기술 지표, CLIP 점수·장면, 임베딩, 후보·검증 결과, 69장·50장 목록 |
+| `work/04_review_sheets/` | AI가 검토한 밀착 시트 13장(1차 147컷, 추가 60컷, 자동탈락 재검토 47컷) |
+| `work/05_focus_check/` | 69장 원본 50% 배율 초점 검증 시트 |
+| `work/06_crop_grid/` | 크롭 결정용 10% 격자 시트 |
+| `work/07_look_dev/` | 룩 개발 전후 비교, 노이즈 처리 전후, 컷별 현상 파라미터 |
+| `work/08_logs/` | 실행 로그 |
+
+NEF 원본은 저장소에 넣지 않는다. Drive 폴더 「2026Stadium사진」이 기준이다(ID: `work/01_inventory/final50_nef_ids.tsv`).
 
 ## 보정 원칙
 전역 톤·색, 크롭, 수평만 쓴다. 합성하거나 객체를 지우지 않는다. 자세한 기준은 브리프 2절에 있다.
