@@ -17,6 +17,9 @@ LOOKS = {
                       hsl=[(110, 35, -6, 0.72), (30, 15, 0, 1.10), (0, 12, 0, 1.05)]),
     "arena":     dict(wb=0.20, tint=(0.97, 1.00, 1.04), mid=0.28, contrast=0.35, clarity=0.22, matte=0.000, vign=0.20, sat=0.95,
                       hsl=[(200, 40, 0, 1.06), (20, 18, 3, 0.90)]),
+    # 21번(PT1_0253) 전용: 기자가 카메라 원본 색감(어둡고 따뜻하고 블랙이 깊음)을 선호 → 리프트·매트·차가운 틴트 제거
+    "arena_cam": dict(wb=0.00, tint=(0.98, 1.00, 0.99), mid=0.245, contrast=0.40, clarity=0.18, matte=0, vign=0.15, sat=1.00, lift=1.0,
+                      hsl=[(120, 30, 0, 1.06)]),
     "victory":   dict(wb=0.25, tint=(1.06, 1.00, 0.92), mid=0.42, contrast=0.35, clarity=0.22, matte=0.010, vign=0.16, sat=0.98,
                       hsl=[(320, 30, 0, 0.65), (8, 14, 5, 0.88), (50, 15, 0, 1.10)]),
     "redstage":  dict(wb=0.00, tint=(1.00, 1.00, 1.00), mid=0.30, contrast=0.45, clarity=0.20, matte=0.000, vign=0.12, sat=0.95,
@@ -119,7 +122,7 @@ def develop(args):
     Y2 = Y + L["clarity"] * (Y - blur) * mid.clip(0, 1)
     img = img * (Y2 / np.maximum(Y, 1e-4))[..., None]
     # 7) 신문용 미드톤 리프트 + 매트 블랙 + 비네팅
-    img = np.power(np.clip(img, 0, 1), NEWSPRINT_MID_LIFT)
+    img = np.power(np.clip(img, 0, 1), L.get("lift", NEWSPRINT_MID_LIFT))   # 룩별 덮어쓰기 가능(기본 0.92)
     img = L["matte"] + (1 - L["matte"]) * img
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
     r2 = ((xx - w / 2) / (w / 2)) ** 2 + ((yy - h / 2) / (h / 2)) ** 2

@@ -69,3 +69,6 @@ PT2_0478.jpg cleantech iso12800 ev+1.71 4211x2489  # A안, meter=전체 프레�
 # 측정: 겹치는 영역 색차 중앙값 ΔE — 2번 3.1(고정 전)→1.0(고정 후), 49번 4.4→0.7. 회귀 확인: meter 없는 PT1_0556·PT1_0012 화소 차 0
 PT2_0246.jpg rainpitch iso100 ev+2.24 3549x2370  # A안, meter=0.03,0.22,0.80,1.00
 PT1_0493.jpg hardwood iso1600 ev+1.36 4812x3815  # A안, meter=0.00,0.10,1.00,1.00
+PT1_0253.jpg arena iso11400 ev+2.11 5294x3896  # 리뷰 크롭, meter=전체
+PT1_0556.jpg victory iso1600 ev+1.85 4813x3373  # 리뷰 크롭, meter=0.05,0.05,0.95,0.95
+PT1_0623.jpg victory iso900 ev+2.82 5053x3694  # 리뷰 크롭, meter=전체
