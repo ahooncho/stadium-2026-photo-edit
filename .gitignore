@@ -1,0 +1,11 @@
+# 원본·대용량 산출물은 Drive/Release로 관리
+raw/
+work/
+out/
+*.NEF
+*.nef
+*.tif
+*.tiff
+*.psd
+__pycache__/
+.DS_Store
