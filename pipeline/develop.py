@@ -21,12 +21,14 @@ LOOKS = {
                       hsl=[(120, 30, 0, 1.20), (210, 40, 0, 1.20), (25, 20, 0, 0.85)]),
     "victory":   dict(wb=0.60, tint=(1.02, 1.00, 0.98), mid=0.43, contrast=0.45, black=0.02, grad=0, clarity=0.22, matte=0, vign=0.16, sat=1.08,
                       hsl=[(320, 30, 0, 0.70), (50, 15, 0, 1.15), (0, 14, 0, 1.08)]),
-    "redstage":  dict(wb=0.00, tint=(1.00, 1.00, 1.00), mid=0.26, contrast=0.55, black=0.04, grad=0, clarity=0.20, matte=0, vign=0.12, sat=1.05,
+    "redstage":  dict(wb=0.00, tint=(1.00, 1.00, 1.00), mid=0.30, contrast=0.50, black=0.04, grad=0, clarity=0.20, matte=0, vign=0.12, sat=1.05,
                       hsl=[(0, 20, -2, 1.10), (330, 18, 0, 1.05)]),
     "cleantech": dict(wb=0.80, tint=(1.00, 1.00, 1.00), mid=0.45, contrast=0.40, black=0.02, grad=0, clarity=0.25, matte=0, vign=0.10, sat=1.05,
                       hsl=[(115, 30, 0, 1.00)]),
     "campus":    dict(wb=0.70, tint=(1.00, 1.00, 1.00), mid=0.44, contrast=0.30, black=0.01, grad=0, clarity=0.20, matte=0, vign=0.05, sat=1.03, hsl=[]),
 }
+SKIN_BAND = (22, 24, 0, 0.92, 1.05)   # v3.2: 피부(주황) 대역 — 전역 채도 상향에서 제외, 살짝 밝게
+SKIN_LIFT = 0.05                       # v3.2: 피부가 있는 중상 톤(Y≈0.58) 범프 커브 높이
 NEWSPRINT_MID_LIFT = 1.0    # v3.1: 마스터에는 적용 안 함(인쇄 대응은 CMYK 변환 단계에서 별도)
 OUT_SHARP = 0.65            # 신문 출력 샤프닝 양
 
@@ -48,12 +50,13 @@ def srgb_oetf(x):
 def hsl_adjust(rgb, bands, sat):
     hsv = cv2.cvtColor(rgb.astype(np.float32), cv2.COLOR_RGB2HSV)  # H 0..360, S,V 0..1
     h, s = hsv[..., 0], hsv[..., 1]
-    s_mul = np.full_like(s, sat); h_add = np.zeros_like(h)
-    for c, w, dh, ds in bands:
+    s_mul = np.full_like(s, sat); h_add = np.zeros_like(h); v_mul = np.ones_like(s)
+    for band in bands:
+        c, w, dh, ds = band[:4]; dv = band[4] if len(band) > 4 else 1.0
         d = np.abs(((h - c + 180) % 360) - 180)
         wgt = np.exp(-0.5 * (d / (w / 2)) ** 2) * np.clip(s * 3, 0, 1)  # 무채색엔 영향 줄임
-        s_mul *= 1 + (ds - 1) * wgt; h_add += dh * wgt
-    hsv[..., 0] = (h + h_add) % 360
+        s_mul *= 1 + (ds - 1) * wgt; h_add += dh * wgt; v_mul *= 1 + (dv - 1) * wgt
+    hsv[..., 0] = (h + h_add) % 360; hsv[..., 2] = np.clip(hsv[..., 2] * v_mul, 0, 1)
     s2 = s * s_mul
     hsv[..., 1] = np.where(s2 > 0.8, 0.8 + (s2 - 0.8) * 0.4, s2).clip(0, 1)  # 신문 색역 압축
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
@@ -103,10 +106,14 @@ def develop(args):
     img = srgb_oetf(tonemap(img)).astype(np.float32)
     sm = img * img * (3 - 2 * img); img = img + L["contrast"] * (sm - img)
     if L.get("black"): img = np.clip((img - L["black"]) / (1 - L["black"]), 0, 1)   # 블랙 포인트
+    sl = L.get("skin_lift", SKIN_LIFT)   # v3.2: 그림자 대비는 두고 피부 톤역(중상 톤)만 연다
+    if sl:
+        Yb = luma(img); Y2 = Yb + sl * np.exp(-0.5 * ((Yb - 0.58) / 0.13) ** 2)
+        img = np.clip(img * (Y2 / np.maximum(Yb, 1e-4))[..., None], 0, 1)
     # 4) 노이즈(고감도)
     img = denoise(img, iso)
     # 5) 색: 장면별 HSL + 신문 색역 압축
-    img = hsl_adjust(np.clip(img, 0, 1), L["hsl"], L["sat"])
+    img = hsl_adjust(np.clip(img, 0, 1), L["hsl"] + [SKIN_BAND], L["sat"])
     # 6) 국소 대비(clarity), 중간톤에만
     Y = luma(img); blur = cv2.GaussianBlur(Y, (0, 0), max(Y.shape) / 150)
     mid = 1 - np.abs(Y - 0.5) * 2
