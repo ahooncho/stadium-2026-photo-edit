@@ -79,10 +79,8 @@ function getStatus() {
   if (!d.title) L('warn', '"제목:" 줄이 비어 있습니다.');
   if (d.title && width_(d.title) > CFG.TITLE_MAX) L('err', `제목이 한 줄(약 ${CFG.TITLE_MAX}자)을 넘을 수 있습니다: ${d.title.length}자.`);
   if (d.deck && width_(d.deck) > CFG.DECK_MAX) L('err', `부제가 한 줄(약 ${CFG.DECK_MAX}자)을 넘을 수 있습니다.`);
-  d.bylines.forEach((b, i) => {
-    if (i === 0 && !/기자\s+\S+@postech\.ac\.kr$/.test(b)) L('err', `첫 바이라인은 도메인까지 전부: "${b}"`);
-    if (i > 0 && !/기자\s+\S+@$/.test(b)) L('err', `두 번째 이후 바이라인은 "아이디@"까지만: "${b}"`);
-  });
+  // 도메인 전체(아이디@postech.ac.kr)는 신문 1면의 첫 바이라인만. 이 기사(4면)는 모두 "아이디@"
+  d.bylines.forEach(b => { if (!/기자\s+\S+@$/.test(b)) L('err', `바이라인은 "아이디@"까지만(도메인 전체는 1면 첫 바이라인만): "${b}"`); });
   const ell = (d.bodyText.match(/…|\.\.\./g) || []).length;
   if (ell > 2) L('warn', `말줄임표가 ${ell}번 나옵니다. 남발하지 않습니다.`);
   if (/KAIST\s*23|POSTECH\s*20|중간\s*순위/.test(d.bodyText)) L('err', '19:38 중간 순위(KAIST 23·POSTECH 20)로 보이는 표현이 있습니다. 최종 결과는 POSTECH 종합우승.');
