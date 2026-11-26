@@ -27,6 +27,27 @@ LOOKS = {
     "cleantech": dict(wb=0.80, tint=(1.00, 1.00, 1.00), mid=0.48, contrast=0.30, clarity=0.25, matte=0.010, vign=0.08, sat=1.00,
                       hsl=[(115, 30, 0, 0.85)]),
     "campus":    dict(wb=0.70, tint=(1.00, 1.00, 1.00), mid=0.45, contrast=0.25, clarity=0.20, matte=0.010, vign=0.05, sat=1.00, hsl=[]),
+    # 480호 4면 리뷰 반영(2026-11-26) 시험 룩
+    "arena_n1": dict(wb=0.50, tint=(1.00, 1.00, 1.00), mid=0.34, contrast=0.35, clarity=0.20, matte=0.010, vign=0.12, sat=0.92,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(2.0, 4)),
+    "arena_n2": dict(wb=0.65, tint=(1.00, 1.00, 1.00), mid=0.38, contrast=0.33, clarity=0.20, matte=0.010, vign=0.12, sat=0.90,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(2.0, 4)),
+    "arena_n3": dict(wb=0.65, tint=(1.00, 1.00, 1.00), mid=0.38, contrast=0.33, clarity=0.20, matte=0.010, vign=0.12, sat=0.90,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(1.5, 2)),
+    "arena_n4": dict(wb=0.65, tint=(1.00, 1.00, 1.00), mid=0.38, contrast=0.33, clarity=0.20, matte=0.010, vign=0.12, sat=0.90,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(5.0, 5)),
+    "arena_n5": dict(wb=0.65, tint=(1.00, 1.00, 1.00), mid=0.38, contrast=0.33, clarity=0.20, matte=0.010, vign=0.12, sat=0.90,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(5.0, 7)),
+    "arena_n6": dict(wb=0.55, tint=(1.00, 1.00, 1.00), mid=0.35, contrast=0.35, clarity=0.18, matte=0.010, vign=0.12, sat=0.90,
+                     hsl=[(120, 30, 0, 1.06), (20, 18, 0, 0.85)], nr=(8.0, 5)),
+    "rainpitch_j3": dict(wb=0.50, tint=(0.97, 1.00, 1.04), mid=0.44, contrast=0.30, clarity=0.28, matte=0.030, vign=0.12, sat=0.93,
+                      hsl=[(110, 35, -6, 0.72), (30, 15, 0, 1.10), (0, 12, 0, 1.05), (75, 22, 0, 0.70, 0.72)]),
+    "rainpitch_j4": dict(wb=0.50, tint=(0.97, 1.00, 1.04), mid=0.44, contrast=0.30, clarity=0.28, matte=0.030, vign=0.12, sat=0.93,
+                      hsl=[(110, 35, -6, 0.72), (30, 15, 0, 1.10), (0, 12, 0, 1.05), (75, 22, 0, 0.62, 0.62)]),
+    "rainpitch_j1": dict(wb=0.50, tint=(0.97, 1.00, 1.04), mid=0.44, contrast=0.30, clarity=0.28, matte=0.030, vign=0.12, sat=0.93,
+                      hsl=[(110, 35, -6, 0.72), (30, 15, 0, 1.10), (0, 12, 0, 1.05), (75, 22, 0, 0.55, 0.88)]),
+    "rainpitch_j2": dict(wb=0.50, tint=(0.97, 1.00, 1.04), mid=0.44, contrast=0.30, clarity=0.28, matte=0.030, vign=0.12, sat=0.93,
+                      hsl=[(110, 35, -6, 0.72), (30, 15, 0, 1.10), (0, 12, 0, 1.05), (75, 22, 0, 0.40, 0.80)]),
 }
 # mid: 중앙 가중 중간톤의 '표시값' 목표(0..1). 무드 장면은 낮게.
 NEWSPRINT_MID_LIFT = 0.92   # 출력 감마(<1이면 밝아짐): 망점 확대 선보상
@@ -57,21 +78,23 @@ def srgb_oetf(x):
 def hsl_adjust(rgb, bands, sat):
     hsv = cv2.cvtColor(rgb.astype(np.float32), cv2.COLOR_RGB2HSV)  # H 0..360, S,V 0..1
     h, s = hsv[..., 0], hsv[..., 1]
-    s_mul = np.full_like(s, sat); h_add = np.zeros_like(h)
-    for c, w, dh, ds in bands:
+    s_mul = np.full_like(s, sat); h_add = np.zeros_like(h); v_mul = np.ones_like(s)
+    for band in bands:   # (중심 hue°, 폭°, hue 이동°, 채도 배율[, 명도 배율])
+        c, w, dh, ds = band[:4]; dv = band[4] if len(band) > 4 else 1.0
         d = np.abs(((h - c + 180) % 360) - 180)
         wgt = np.exp(-0.5 * (d / (w / 2)) ** 2) * np.clip(s * 3, 0, 1)  # 무채색엔 영향 줄임
-        s_mul *= 1 + (ds - 1) * wgt; h_add += dh * wgt
+        s_mul *= 1 + (ds - 1) * wgt; h_add += dh * wgt; v_mul *= 1 + (dv - 1) * wgt
     hsv[..., 0] = (h + h_add) % 360
+    hsv[..., 2] = hsv[..., 2] * v_mul
     s2 = s * s_mul
     hsv[..., 1] = np.where(s2 > 0.8, 0.8 + (s2 - 0.8) * 0.4, s2).clip(0, 1)  # 신문 색역 압축
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
-def denoise(rgb, iso):
+def denoise(rgb, iso, nr=None):
     if iso < 800: return rgb
     ycc = cv2.cvtColor(rgb.astype(np.float32), cv2.COLOR_RGB2YCrCb)
     tiers = [(1600, 1.5, 3), (3200, 2.5, 5), (6400, 3.5, 8), (10**9, 5.0, 11)]
-    cs, h = next((c, hh) for lim, c, hh in tiers if iso < lim)
+    cs, h = nr if nr else next((c, hh) for lim, c, hh in tiers if iso < lim)   # nr=(색 블러 σ, 휘도 NLM h) 룩별 덮어쓰기
     for c in (1, 2): ycc[..., c] = cv2.GaussianBlur(ycc[..., c], (0, 0), cs)
     y8 = (ycc[..., 0].clip(0, 1) * 255).astype(np.uint8)
     yd = cv2.fastNlMeansDenoising(y8, None, h, 5, 15).astype(np.float32) / 255
@@ -113,7 +136,7 @@ def develop(args):
     img = srgb_oetf(tonemap(img)).astype(np.float32)
     sm = img * img * (3 - 2 * img); img = img + L["contrast"] * (sm - img)
     # 4) 노이즈(고감도)
-    img = denoise(img, iso)
+    img = denoise(img, iso, L.get("nr"))
     # 5) 색: 장면별 HSL + 신문 색역 압축
     img = hsl_adjust(np.clip(img, 0, 1), L["hsl"], L["sat"])
     # 6) 국소 대비(clarity), 중간톤에만
