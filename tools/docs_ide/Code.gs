@@ -6,7 +6,6 @@ const CFG = {
   MIN: 1720, MAX: 1850, TARGET: 1800,            // 본문 공백 포함 글자 수(실측 기반)
   PER_SLOT: 20.4,                                // 476~479호 [대학]면 실측: 줄 칸당 공백 포함 글자 수(문단 끝·소제목 포함)
   COLS: [['1단', 31], ['2단', 31], ['3단', 10], ['4단', 10], ['5단', 8]],
-  BLOCK_TARGET: { '①': 250, '②': 550, '③': 250, '④': 550, '⑤': 200 },
   TITLE_MAX: 30, DECK_MAX: 55,
   SECTION: '대학',
   SUBMIT_FOLDER: '1OI4pAW6qr2dRzVORPN0qZlOqdCtVWeOy',
@@ -24,57 +23,43 @@ function showSidebar() {
   DocumentApp.getUi().showSidebar(HtmlService.createHtmlOutputFromFile('Sidebar').setTitle('기사 IDE'));
 }
 
-/* ---------- 문서 읽기 ---------- */
+/* ---------- 문서 읽기 ----------
+ * 문서 구조(기자가 쓰는 것만): "제목:" "부제:" 줄 / 제목 2 「본문」 / 바이라인 / 제목 2 「캡션」 아래 "1 LoL — ▲…" 4줄 /
+ * 제목 2 「확인할 것」 아래 목록(확인되면 취소선 또는 삭제)
+ */
+const CAP_MAX = { 1: 40, 2: 60, 3: 40, 4: 19 };   // 사진 폭별 캡션 한 줄 최대(2단·3단·2단·1단)
 function parse_() {
   const body = DocumentApp.getActiveDocument().getBody();
-  const out = { blocks: [], bylines: [], title: '', deck: '', captions: [], factOpen: [], highlights: 0, bodyText: '' };
-  let inBody = false, cur = null;
-  const n = body.getNumChildren();
-  for (let i = 0; i < n; i++) {
-    const el = body.getChild(i);
-    const type = el.getType();
-    if (type === DocumentApp.ElementType.PARAGRAPH) {
-      const p = el.asParagraph(), t = p.getText().trim(), h = p.getHeading();
-      if (/^확정 제목\s*:/.test(t)) out.title = t.replace(/^확정 제목\s*:\s*/, '');
-      if (/^확정 부제\s*:/.test(t)) out.deck = t.replace(/^확정 부제\s*:\s*/, '');
-      if (h === DocumentApp.ParagraphHeading.HEADING2) { inBody = /^8\./.test(t); cur = null; continue; }
-      if (!inBody) continue;
-      if (h === DocumentApp.ParagraphHeading.HEADING3 && /^[①②③④⑤]/.test(t)) {
-        cur = { key: t[0], name: t, paras: [] }; out.blocks.push(cur); continue;
-      }
-      if (!t || /^블록 제목/.test(t)) continue;
-      if (/기자\s+\S*@\S*$/.test(t)) { out.bylines.push(t); continue; }
-      if (cur) cur.paras.push(t);
-      out.highlights += countHighlights_(p);
-    } else if (type === DocumentApp.ElementType.TABLE) {
-      readTable_(el.asTable(), out);
+  const out = { paras: [], bylines: [], title: '', deck: '', captions: [], factOpen: [], highlights: 0, bodyText: '' };
+  let sec = '';
+  for (let i = 0; i < body.getNumChildren(); i++) {
+    const el = body.getChild(i), type = el.getType();
+    if (type !== DocumentApp.ElementType.PARAGRAPH && type !== DocumentApp.ElementType.LIST_ITEM) continue;
+    const p = type === DocumentApp.ElementType.LIST_ITEM ? el.asListItem() : el.asParagraph();
+    const t = p.getText().trim(), h = p.getHeading();
+    if (/^제목\s*:/.test(t)) { out.title = t.replace(/^제목\s*:\s*/, ''); continue; }
+    if (/^부제\s*:/.test(t)) { out.deck = t.replace(/^부제\s*:\s*/, ''); continue; }
+    if (h !== DocumentApp.ParagraphHeading.NORMAL) { sec = t; continue; }
+    if (!t) continue;
+    if (sec === '본문') {
+      if (/기자\s+\S*@\S*$/.test(t)) out.bylines.push(t);
+      else { out.paras.push(t); out.highlights += countHighlights_(p); }
+    } else if (sec === '캡션') {
+      const m = t.match(/^(\d)\s+(.+?)\s+[—-]\s*(.*)$/);
+      if (m) out.captions.push({ photo: m[1] + ' ' + m[2], max: CAP_MAX[+m[1]] || 40, text: m[3].trim() });
+    } else if (sec === '확인할 것') {
+      if (!isStruck_(p)) out.factOpen.push(t);
     }
   }
-  out.bodyText = out.blocks.map(b => b.paras.join('\n')).filter(Boolean).join('\n');
+  out.bodyText = out.paras.join('\n');
   return out;
 }
-function readTable_(tb, out) {
-  if (tb.getNumRows() < 2) return;
-  const head = [];
-  for (let c = 0; c < tb.getRow(0).getNumCells(); c++) head.push(tb.getRow(0).getCell(c).getText().trim());
-  const capCol = head.indexOf('캡션(작성)'), maxCol = head.indexOf('한 줄 최대'), stCol = head.indexOf('상태');
-  for (let r = 1; r < tb.getNumRows(); r++) {
-    const row = tb.getRow(r), cell = c => (c >= 0 && c < row.getNumCells()) ? row.getCell(c).getText().trim() : '';
-    if (head[0] === '사진' && capCol >= 0) {
-      const m = cell(maxCol).match(/(\d+)/);
-      out.captions.push({ photo: cell(0), max: m ? +m[1] : 40, text: cell(capCol) });
-    }
-    if (stCol >= 0 && head[0] === '항목' && /확인 필요|재확인|미확인/.test(cell(stCol))) out.factOpen.push(cell(0));
-  }
+function isStruck_(p) {
+  const tx = p.editAsText(); return tx.getText().length > 0 && tx.isStrikethrough(0) === true;
 }
 function countHighlights_(p) {
-  let k = 0;
-  for (let i = 0; i < p.getNumChildren(); i++) {
-    const c = p.getChild(i);
-    if (c.getType() !== DocumentApp.ElementType.TEXT) continue;
-    const tx = c.asText(), idx = tx.getTextAttributeIndices();
-    idx.forEach(o => { const bg = tx.getBackgroundColor(o); if (bg && bg.toLowerCase() !== '#ffffff') k++; });
-  }
+  const tx = p.editAsText(); let k = 0;
+  tx.getTextAttributeIndices().forEach(o => { const bg = tx.getBackgroundColor(o); if (bg && bg.toLowerCase() !== '#ffffff') k++; });
   return k;
 }
 
@@ -83,9 +68,6 @@ function width_(s) { let w = 0; for (const ch of s) w += /[\u0000-\u007f]/.test(
 function getStatus() {
   const d = parse_();
   const chars = d.bodyText.replace(/\n/g, '').length, noSpace = d.bodyText.replace(/\s/g, '').length;
-  const blocks = d.blocks.map(b => {
-    const c = b.paras.join('').length; return { name: b.name, chars: c, target: CFG.BLOCK_TARGET[b.key] || 0 };
-  });
   // 5단 채움 예측: 실측 칸당 글자 수로 필요한 줄 칸을 구해 읽는 순서대로 채운다
   let slots = chars / CFG.PER_SLOT; const cols = [];
   CFG.COLS.forEach(([name, cap]) => { const used = Math.min(cap, Math.max(0, slots)); cols.push({ name, cap, used: +used.toFixed(1) }); slots -= cap; });
@@ -94,7 +76,7 @@ function getStatus() {
   const L = (lv, msg) => lint.push({ lv, msg });
   if (chars < CFG.MIN) L('warn', `본문이 ${CFG.MIN - chars}자 모자랍니다(허용 ${CFG.MIN}~${CFG.MAX}).`);
   if (chars > CFG.MAX) L('err', `본문이 ${chars - CFG.MAX}자 넘칩니다(허용 ${CFG.MIN}~${CFG.MAX}).`);
-  if (!d.title) L('warn', '3절 "확정 제목:" 줄이 비어 있습니다.');
+  if (!d.title) L('warn', '"제목:" 줄이 비어 있습니다.');
   if (d.title && width_(d.title) > CFG.TITLE_MAX) L('err', `제목이 한 줄(약 ${CFG.TITLE_MAX}자)을 넘을 수 있습니다: ${d.title.length}자.`);
   if (d.deck && width_(d.deck) > CFG.DECK_MAX) L('err', `부제가 한 줄(약 ${CFG.DECK_MAX}자)을 넘을 수 있습니다.`);
   d.bylines.forEach((b, i) => {
@@ -113,8 +95,7 @@ function getStatus() {
     if (width_(c.text) > c.max) L('err', `캡션 한 줄(약 ${c.max}자) 초과 가능: ${c.photo} (${c.text.length}자)`);
   });
   if (d.highlights) L('warn', `본문에 형광펜(확인 필요 표시)이 ${d.highlights}곳 남아 있습니다.`);
-  blocks.forEach(b => { if (b.target && b.chars > b.target * 1.25) L('info', `${b.name}: 목표 ${b.target}자보다 ${b.chars - b.target}자 많습니다.`); });
-  return { chars, noSpace, target: CFG.TARGET, min: CFG.MIN, max: CFG.MAX, blocks, cols, overflowLines,
+  return { chars, noSpace, target: CFG.TARGET, min: CFG.MIN, max: CFG.MAX, cols, overflowLines,
            title: d.title, deck: d.deck, factOpen: d.factOpen, lint, figma: CFG.FIGMA,
            updated: Utilities.formatDate(new Date(), 'Asia/Seoul', 'HH:mm:ss') };
 }
@@ -126,7 +107,7 @@ function buildSubmissionUi() {
 }
 function buildSubmission() {
   const d = parse_();
-  if (!d.title) return { ok: false, error: '3절 "확정 제목:"을 먼저 채우세요.' };
+  if (!d.title) return { ok: false, error: '"제목:" 줄을 먼저 채우세요.' };
   const base = `[${CFG.SECTION}] ${d.title}`.replace(/[\\/:*?"<>|]/g, ' ').trim();
   const stamp = Utilities.formatDate(new Date(), 'Asia/Seoul', 'MMdd-HHmm');
   const folder = DriveApp.getFolderById(CFG.SUBMIT_FOLDER).createFolder(`빌드 ${stamp}`);
@@ -135,7 +116,7 @@ function buildSubmission() {
   const doc = DocumentApp.create(base); const b = doc.getBody();
   b.appendParagraph(d.title).setHeading(DocumentApp.ParagraphHeading.TITLE);
   if (d.deck) b.appendParagraph(d.deck).setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
-  d.blocks.forEach(bl => bl.paras.forEach(t => b.appendParagraph(t)));
+  d.paras.forEach(t => b.appendParagraph(t));
   b.appendParagraph('');
   d.bylines.forEach(t => b.appendParagraph(t).setAlignment(DocumentApp.HorizontalAlignment.RIGHT));
   if (b.getChild(0).asParagraph().getText() === '') b.removeChild(b.getChild(0));
