@@ -1,0 +1,43 @@
+<!DOCTYPE html><html><head><base target="_top"><style>
+body{font-family:'Noto Sans KR',Arial,sans-serif;font-size:12px;margin:8px;color:#222}
+h3{font-size:12px;margin:12px 0 4px;color:#1a3d6e}
+.big{font-size:22px;font-weight:700}.sub{color:#666}
+.bar{height:10px;background:#eee;border-radius:3px;overflow:hidden;margin:2px 0 6px}.bar>div{height:100%}
+.ok{background:#34a853}.warn{background:#fbbc04}.err{background:#ea4335}
+.row{display:flex;justify-content:space-between}
+ul{padding-left:16px;margin:4px 0} li{margin:2px 0}
+li.err{color:#c5221f} li.warn{color:#b06000} li.info{color:#555}
+button{margin:4px 4px 0 0;padding:4px 8px}
+</style></head><body>
+<div class="row"><span class="sub">자동 갱신 5초</span><span class="sub" id="upd"></span></div>
+<h3>분량 (본문, 공백 포함)</h3>
+<div><span class="big" id="chars">-</span> <span class="sub" id="range"></span></div>
+<div class="bar"><div id="totbar"></div></div>
+<div id="blocks"></div>
+<h3>5단 채움 예측</h3><div id="cols"></div><div id="ovf" class="sub"></div>
+<h3>제목·부제</h3><div id="tt" class="sub"></div>
+<h3>린트</h3><ul id="lint"></ul>
+<h3>팩트 '확인 필요'</h3><ul id="facts"></ul>
+<button onclick="refresh()">새로고침</button><button onclick="build()">제출 빌드</button>
+<div id="msg" class="sub"></div>
+<p class="sub">조판 미리보기(Figma에 실제 텍스트 앉히기)는 Claude에게 "조판해 줘"라고 요청. <a id="fig" target="_blank">Figma 시안</a></p>
+<script>
+function cls(v,min,max){return v>max?'err':(v<min?'warn':'ok')}
+function render(s){
+ document.getElementById('upd').textContent=s.updated;
+ document.getElementById('chars').textContent=s.chars+'자';
+ document.getElementById('range').textContent='목표 '+s.target+' (허용 '+s.min+'~'+s.max+') · 공백 제외 '+s.noSpace;
+ var tb=document.getElementById('totbar');tb.style.width=Math.min(100,s.chars/s.max*100)+'%';tb.className=cls(s.chars,s.min,s.max);
+ document.getElementById('blocks').innerHTML=s.blocks.map(function(b){var w=b.target?Math.min(100,b.chars/b.target*100):0;
+  return '<div class="row"><span>'+b.name+'</span><span>'+b.chars+' / '+b.target+'</span></div><div class="bar"><div class="'+(b.chars>b.target*1.25?'warn':'ok')+'" style="width:'+w+'%"></div></div>'}).join('');
+ document.getElementById('cols').innerHTML=s.cols.map(function(c){return '<div class="row"><span>'+c.name+'</span><span>'+c.used+' / '+c.cap+'줄</span></div><div class="bar"><div class="ok" style="width:'+(c.used/c.cap*100)+'%"></div></div>'}).join('');
+ document.getElementById('ovf').textContent=s.overflowLines?('⚠ 약 '+s.overflowLines+'줄 넘침'):'';
+ document.getElementById('tt').textContent=(s.title||'(확정 제목 없음)')+(s.deck?' / '+s.deck:'');
+ document.getElementById('lint').innerHTML=s.lint.length?s.lint.map(function(l){return '<li class="'+l.lv+'">'+l.msg+'</li>'}).join(''):'<li>문제 없음</li>';
+ document.getElementById('facts').innerHTML=s.factOpen.length?s.factOpen.map(function(f){return '<li class="warn">'+f+'</li>'}).join(''):'<li>모두 확인됨</li>';
+ document.getElementById('fig').href=s.figma;
+}
+function refresh(){google.script.run.withSuccessHandler(render).withFailureHandler(function(e){document.getElementById('msg').textContent='오류: '+e.message}).getStatus()}
+function build(){document.getElementById('msg').textContent='빌드 중…';google.script.run.withSuccessHandler(function(r){document.getElementById('msg').innerHTML=r.ok?('완료: <a target="_blank" href="'+r.url+'">제출 폴더</a> · '+r.notes.join(' · ')):('중단: '+r.error)}).buildSubmission()}
+refresh();setInterval(refresh,5000);
+</script></body></html>
