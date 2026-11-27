@@ -31,7 +31,7 @@
 - STadium 11/14(토) 09–21시, 종일 비. KAIST·GIST·DGIST·UNIST·POSTECH·KENTECH. **최종 POSTECH 종합우승(기자 확인)**
 - 19:38 중간 순위(KAIST 23·POSTECH 20…)는 축구 결선 미반영. 최종으로 쓰지 않는다
 - 종목: 축구 결승 UNIST(결과 **미확인**), 농구 준우승(결선 KAIST 16–31), 배드민턴 준우승(결승 GIST 0–2), 야구 UNIST 4–6 탈락, LoL 우승(결선 DGIST 2–0)
-- 공연(대강당): BREMEN·STEELER(밴드), P-FUNK(힙합), 음치(보컬), Ctrl-D·댄스연합(댄스), CHEERO(응원단, 폐막). 공연 40분 지연(13:00→13:40)
+- 공연(대강당): BREMEN·STEELER(밴드), P-FUNK(힙합), 음치(보컬), Ctrl-D(댄스), POSTECH 댄스 연합 공연(참여 동아리 미기재), CHEERO(응원단, 폐막). 공연 40분 지연(13:00→13:40)
 - 폐막식: 상패 시상, 경품 추첨, CHEERO 공연. STating(3:3 소개팅 부스) 학생회관 음악감상실 13–19시
 - 운영: 야구 첫 경기 우천 30분 지연, MindFreak 13:00→17:00 이동, 도시락 부족 제보(**미확인**)
 - IT ARENA × 태진기술 11/14 10:00 – 11/15 17:00. 6개 대학 IT 동아리 학술 교류회, STadium과 별도. 주최 IST-TECH IT Network. 개회식 인공지능연구원 중강당

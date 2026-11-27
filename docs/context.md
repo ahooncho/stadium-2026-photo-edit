@@ -18,7 +18,7 @@
   - LoL: GIST 2–0, 결선 DGIST 2–0 **우승**
 - **최종: POSTECH 종합우승**(기자 확인). 참고로 19:38 중간 순위(축구 결선 미반영)는 KAIST 23, POSTECH 20, UNIST 15, DGIST 11, GIST 6, KENTECH 0이었다. 이 중간 순위를 최종으로 오기한 적이 있다(브리프 초판)
 - 운영 차질: 공연 40분 지연 시작(13:00→13:40), 야구 첫 경기 우천 30분 지연, 도시락 부족 제보(미확인), MindFreak 13:00→17:00 이동
-- POSTECH 출연 공연: BREMEN·STEELER(밴드), P-FUNK(힙합), 음치(보컬), Ctrl-D·댄스연합(댄스), CHEERO(응원단, 폐막)
+- POSTECH 출연 공연: BREMEN·STEELER(밴드), P-FUNK(힙합), 음치(보컬), Ctrl-D(댄스), POSTECH 댄스 연합 공연(20:17, 참여 동아리 미기재), CHEERO(응원단, 폐막). 2026-11-27 정정: 이전 표기 "댄스연합"은 동아리 이름이 아니라 시간표의 "POSTECH 댄스 연합 공연" 순서를 잘못 줄인 것(출처: Google Calendar「포항공대신문 취재」→「STadium 동아리 공연」)
 - 폐막식: 상패 시상·경품 추첨·CHEERO 공연 / STating(3:3 소개팅 부스) 학생회관 음악감상실 13–19시
 
 ## 2026 IST-TECH IT ARENA × 태진기술 (11/14 10:00 – 11/15 17:00)
